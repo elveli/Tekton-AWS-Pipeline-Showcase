@@ -1,0 +1,6 @@
+{
+  "name": "Tekton AWS Pipeline Showcase",
+  "description": "Interactive dashboard demonstrating Tekton pipeline architecture on AWS EKS with ECR integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
