@@ -9,3 +9,9 @@ variable "cluster_name" {
   type        = string
   default     = "tekton-cluster"
 }
+
+variable "vpc_cidr" {
+  description = "The CIDR block for the VPC"
+  type        = string
+  default     = "10.42.0.0/16"
+}

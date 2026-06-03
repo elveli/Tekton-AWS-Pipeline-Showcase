@@ -4,11 +4,11 @@ module "vpc" {
   version = "~> 5.0"
 
   name = "${var.cluster_name}-vpc"
-  cidr = "10.0.0.0/16"
+  cidr = var.vpc_cidr
 
   azs             = ["${var.aws_region}a", "${var.aws_region}b", "${var.aws_region}c"]
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
-  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  private_subnets = [cidrsubnet(var.vpc_cidr, 8, 1), cidrsubnet(var.vpc_cidr, 8, 2), cidrsubnet(var.vpc_cidr, 8, 3)]
+  public_subnets  = [cidrsubnet(var.vpc_cidr, 8, 101), cidrsubnet(var.vpc_cidr, 8, 102), cidrsubnet(var.vpc_cidr, 8, 103)]
 
   enable_nat_gateway = true
   single_nat_gateway = true
