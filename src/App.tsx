@@ -3,11 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { pipelineStages, PipelineStage } from './data';
 import {
   Key, GitBranch, Package, Server, FastForward,
-  ChevronRight, Play, CheckCircle2, FileText, Info
+  ChevronRight, Play, CheckCircle2, FileText, Info, Cloud
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ElementType> = {
-  Key, GitBranch, Package, Server, FastForward, FileText
+  Key, GitBranch, Package, Server, FastForward, FileText, Cloud
 };
 
 export default function App() {
@@ -52,7 +52,7 @@ export default function App() {
               {pipelineStages.map((stage, idx) => {
                 const Icon = iconMap[stage.icon] || Info;
                 const isActive = stage.id === activeStageId;
-                const isConfig = stage.id === 'docs' || stage.id === 'setup' || stage.id === 'pipeline'; // visual differentiation
+                const isConfig = stage.id === 'docs' || stage.id === 'infrastructure' || stage.id === 'setup' || stage.id === 'pipeline'; // visual differentiation
 
                 return (
                   <button

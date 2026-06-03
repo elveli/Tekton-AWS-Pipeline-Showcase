@@ -17,22 +17,38 @@ In the interactive dashboard (the React app), you can click through the "Pipelin
 ## Prerequisites
 
 Before executing this pipeline, you need:
-1. **Amazon EKS Cluster**: An active Kubernetes cluster running on AWS.
+1. **Amazon EKS Cluster**: An active Kubernetes cluster running on AWS. *(Can be provisioned via the included Terraform configuration).*
 2. **Tekton Installed**: Tekton Pipelines installed on your EKS cluster.
    \`\`\`bash
    kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
    \`\`\`
 3. **OIDC Provider Enabled**: Your EKS cluster must have an IAM OIDC provider configured (required for IRSA).
-4. **AWS ECR Repository**: A target container registry (e.g., `123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app`).
+4. **AWS ECR Repository**: A target container registry (e.g., `123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app`). *(Can be provisioned via Terraform).*
 5. **Git Repository**: A repository containing a `Dockerfile` and some Kubernetes deployment manifests in a `k8s/` folder.
 
 ---
 
 ## Configuration & Setup
 
+### 0. (Optional) Provision Infrastructure with Terraform
+
+If you prefer Infrastructure as Code over manual setup, check the **Infrastructure as Code** stage in the dashboard.
+It provides a `main.tf` file that provisions a complete **VPC**, an **EKS Cluster**, the **ECR repository**, and the OIDC-backed **IAM Role** for Tekton.
+
+\`\`\`bash
+terraform init
+terraform apply
+# After applying, configure your local kubeconfig:
+aws eks update-kubeconfig --region us-east-1 --name tekton-cluster
+\`\`\`
+
+*(If you use Terraform, you can skip Step 1 below).*
+
+---
+
 ### 1. Configure IAM Roles for Service Accounts (IRSA)
 
-IRSA is the most secure way for pods acting in your pipeline to push to ECR without long-lived credentials.
+IRSA is the most secure way for pods acting in your pipeline to push to ECR without long-lived credentials. If you didn't run Terraform, you can configure it manually:
 
 **A. Create an IAM Policy for ECR Access:**
 Copy the policy from the "AWS IRSA Setup" stage (`iam-policy.json`) and create it in AWS IAM:
