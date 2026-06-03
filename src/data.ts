@@ -13,6 +13,106 @@ export interface PipelineStage {
 
 export const pipelineStages: PipelineStage[] = [
   {
+    id: "docs",
+    title: "Documentation & Setup",
+    icon: "FileText",
+    description: "Read the comprehensive guide on configuring, running, and troubleshooting this pipeline.",
+    overview: "This guide provides instructions on how to use these templates on your Amazon EKS cluster.",
+    files: [
+      {
+        filename: "README.md",
+        language: "markdown",
+        content: `# Tekton AWS ECR & EKS Pipeline Complete Guide
+
+Welcome to the **Tekton on AWS Sample Application**. This guide provides comprehensive instructions on how to take the configuration templates from this repository and apply them to a real Amazon EKS cluster.
+
+## What You See
+
+This sample contains a set of Kubernetes manifests for [Tekton Pipelines](https://tekton.dev/). When applied, they form a robust CI/CD pipeline that:
+1. **Clones** source code from a Git repository.
+2. **Builds** a Docker image without privileged access using Kaniko.
+3. **Pushes** the container image to Amazon Elastic Container Registry (ECR) securely utilizing IAM Roles for Service Accounts (IRSA).
+4. **Deploys** the new image to an Amazon Elastic Kubernetes Service (EKS) cluster using the \`kubectl\` task.
+
+In this interactive dashboard, click through the stages on the left to view the specific \`.yaml\` configurations needed for each step.
+
+---
+
+## Prerequisites
+
+Before executing this pipeline, you need:
+1. **Amazon EKS Cluster**: An active Kubernetes cluster running on AWS.
+2. **Tekton Installed**: Tekton Pipelines installed on your EKS cluster:
+   \`kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml\`
+3. **OIDC Provider Enabled**: Your EKS cluster must have an IAM OIDC provider configured (required for IRSA).
+4. **AWS ECR Repository**: A target container registry.
+5. **Git Repository**: A repository containing a \`Dockerfile\` and some Kubernetes deployment manifests in a \`k8s/\` folder.
+
+---
+
+## Configuration & Setup
+
+### 1. Configure IAM Roles for Service Accounts (IRSA)
+
+IRSA is the most secure way for pods acting in your pipeline to push to ECR without long-lived credentials.
+
+**A. Create an IAM Policy for ECR Access:**
+Copy the policy from the "AWS IRSA Setup" stage (\`iam-policy.json\`) and create it in AWS IAM:
+\`aws iam create-policy --policy-name TektonECRPushPolicy --policy-document file://iam-policy.json\`
+
+**B. Create IAM Role mapped to the Service Account:**
+Using \`eksctl\`, create an IAM role bound to the \`tekton-aws-sa\` ServiceAccount in the \`build-system\` namespace.
+\`\`\`bash
+eksctl create iamserviceaccount \\
+  --cluster=<YOUR_CLUSTER_NAME> \\
+  --namespace=build-system \\
+  --name=tekton-aws-sa \\
+  --attach-policy-arn=arn:aws:iam::<ACCOUNT_ID>:policy/TektonECRPushPolicy \\
+  --approve
+\`\`\`
+
+### 2. Apply Tekton Tasks
+
+You need to register the reusable "Tasks" with your cluster:
+
+1. **Git Clone Task**:
+   \`kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml\`
+2. **Kaniko ECR Task**:
+   \`kubectl apply -f 03-kaniko-ecr-task.yaml\`
+3. **Deploy EKS Task**:
+   \`kubectl apply -f 04-kubectl-deploy-task.yaml\`
+
+### 3. Apply and Trigger the Pipeline
+
+1. **Apply the Pipeline definition**:
+   \`kubectl apply -f 05-pipeline.yaml\`
+
+2. **Trigger the run**: Update parameters in \`06-pipelinerun.yaml\` to point to your specific repository and registry, then run:
+   \`kubectl create -f 06-pipelinerun.yaml\`
+
+---
+
+## Troubleshooting Guide
+
+### 1. ImagePullBackOff or unauthorized on push
+**Cause**: The Kaniko task pod doesn't have the AWS credentials to push to ECR.
+**Fix**: Verify the ServiceAccount (\`tekton-aws-sa\`) has the correct \`eks.amazonaws.com/role-arn\` annotation and the Trust Relationship allows the exact OIDC subject. Ensure \`AWS_SDK_LOAD_CONFIG="true"\` is passed to the Kaniko container.
+
+### 2. fetch-repository fails with Authentication Error
+**Cause**: The Git repository is private.
+**Fix**: Create a Kubernetes Secret containing your Git credentials and attach it to the \`tekton-aws-sa\` ServiceAccount.
+
+### 3. PipelineRun stays in Pending state
+**Cause**: Usually a missing Workspace (PersistentVolumeClaim).
+**Fix**: Ensure your cluster has a default StorageClass capable of dynamic provisioning, or manually create the PersistentVolume attached to the Workspace.
+
+### 4. Deploy task fails with PermissionDenied
+**Cause**: The Service Account lacks Kubernetes RBAC permissions to apply deployments.
+**Fix**: Create a Role and RoleBinding granting edit access to \`tekton-aws-sa\` in the target namespace.`
+      }
+    ]
+  },
+  {
     id: "setup",
     title: "AWS IRSA Setup",
     icon: "Key",

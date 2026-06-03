@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 const iconMap: Record<string, React.ElementType> = {
-  Key, GitBranch, Package, Server, FastForward
+  Key, GitBranch, Package, Server, FastForward, FileText
 };
 
 export default function App() {
@@ -52,7 +52,7 @@ export default function App() {
               {pipelineStages.map((stage, idx) => {
                 const Icon = iconMap[stage.icon] || Info;
                 const isActive = stage.id === activeStageId;
-                const isConfig = stage.id === 'setup' || stage.id === 'pipeline'; // visual differentiation
+                const isConfig = stage.id === 'docs' || stage.id === 'setup' || stage.id === 'pipeline'; // visual differentiation
 
                 return (
                   <button
