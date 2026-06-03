@@ -51,51 +51,51 @@ aws eks update-kubeconfig --region us-east-1 --name tekton-cluster
 IRSA is the most secure way for pods acting in your pipeline to push to ECR without long-lived credentials. If you didn't run Terraform, you can configure it manually:
 
 **A. Create an IAM Policy for ECR Access:**
-Copy the policy from the "AWS IRSA Setup" stage (`iam-policy.json`) and create it in AWS IAM:
-\`\`\`bash
-aws iam create-policy --policy-name TektonECRPushPolicy --policy-document file://iam-policy.json
-\`\`\`
+Copy the policy from the "AWS IRSA Setup" stage (`tekton/iam-policy.json`) and create it in AWS IAM:
+```bash
+aws iam create-policy --policy-name TektonECRPushPolicy --policy-document file://tekton/iam-policy.json
+```
 
 **B. Create IAM Role mapped to the Service Account:**
 Using `eksctl`, create an IAM role bound to the `tekton-aws-sa` ServiceAccount in the `build-system` namespace.
-\`\`\`bash
-eksctl create iamserviceaccount \\
-  --cluster=<YOUR_CLUSTER_NAME> \\
-  --namespace=build-system \\
-  --name=tekton-aws-sa \\
-  --attach-policy-arn=arn:aws:iam::<ACCOUNT_ID>:policy/TektonECRPushPolicy \\
+```bash
+eksctl create iamserviceaccount \
+  --cluster=<YOUR_CLUSTER_NAME> \
+  --namespace=build-system \
+  --name=tekton-aws-sa \
+  --attach-policy-arn=arn:aws:iam::<ACCOUNT_ID>:policy/TektonECRPushPolicy \
   --approve
-\`\`\`
+```
 
-*(Note: If you already applied \`01-service-account.yaml\` manually, ensure the \`eks.amazonaws.com/role-arn\` annotation matches the role created above).*
+*(Note: If you already applied `tekton/01-service-account.yaml` manually, ensure the `eks.amazonaws.com/role-arn` annotation matches the role created above).*
 
 ### 2. Apply Tekton Tasks
 
 You need to register the reusable "Tasks" with your cluster:
 
 1. **Git Clone Task** (from Tekton Catalog):
-   \`\`\`bash
+   ```bash
    kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml
-   \`\`\`
+   ```
 2. **Kaniko ECR Task**:
-   \`\`\`bash
-   kubectl apply -f 03-kaniko-ecr-task.yaml
-   \`\`\`
+   ```bash
+   kubectl apply -f tekton/03-kaniko-ecr-task.yaml
+   ```
 3. **Deploy EKS Task**:
-   \`\`\`bash
-   kubectl apply -f 04-kubectl-deploy-task.yaml
-   \`\`\`
+   ```bash
+   kubectl apply -f tekton/04-kubectl-deploy-task.yaml
+   ```
 
 ### 3. Apply the Pipeline
 
 The Pipeline binds the above tasks together:
-\`\`\`bash
-kubectl apply -f 05-pipeline.yaml
-\`\`\`
+```bash
+kubectl apply -f tekton/05-pipeline.yaml
+```
 
 ### 4. Trigger the PipelineRun
 
-Finally, update the parameters in `06-pipelinerun.yaml` to point to your specific Git repository and ECR registry:
+Finally, update the parameters in `tekton/06-pipelinerun.yaml` to point to your specific Git repository and ECR registry:
 \`\`\`yaml
   params:
     - name: git-url
@@ -105,9 +105,9 @@ Finally, update the parameters in `06-pipelinerun.yaml` to point to your specifi
 \`\`\`
 
 Execute the run:
-\`\`\`bash
-kubectl create -f 06-pipelinerun.yaml
-\`\`\`
+```bash
+kubectl create -f tekton/06-pipelinerun.yaml
+```
 
 ---
 

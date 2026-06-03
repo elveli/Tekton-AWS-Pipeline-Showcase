@@ -1,0 +1,5 @@
+# We use the standard git-clone task from tektoncd/catalog.
+# You can install it directly on your cluster:
+# kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml
+#
+# This relies on the Workspace (shared volume) attached to the PipelineRun.

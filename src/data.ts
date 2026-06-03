@@ -73,8 +73,8 @@ aws eks update-kubeconfig --region us-east-1 --name tekton-cluster
 IRSA is the most secure way for pods acting in your pipeline to push to ECR without long-lived credentials. If you didn't run Terraform, you can configure it manually:
 
 **A. Create an IAM Policy for ECR Access:**
-Copy the policy from the "AWS IRSA Setup" stage (\`iam-policy.json\`) and create it in AWS IAM:
-\`aws iam create-policy --policy-name TektonECRPushPolicy --policy-document file://iam-policy.json\`
+Copy the policy from the "AWS IRSA Setup" stage (\`tekton/iam-policy.json\`) and create it in AWS IAM:
+\`aws iam create-policy --policy-name TektonECRPushPolicy --policy-document file://tekton/iam-policy.json\`
 
 **B. Create IAM Role mapped to the Service Account:**
 Using \`eksctl\`, create an IAM role bound to the \`tekton-aws-sa\` ServiceAccount in the \`build-system\` namespace.
@@ -94,17 +94,17 @@ You need to register the reusable "Tasks" with your cluster:
 1. **Git Clone Task**:
    \`kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml\`
 2. **Kaniko ECR Task**:
-   \`kubectl apply -f 03-kaniko-ecr-task.yaml\`
+   \`kubectl apply -f tekton/03-kaniko-ecr-task.yaml\`
 3. **Deploy EKS Task**:
-   \`kubectl apply -f 04-kubectl-deploy-task.yaml\`
+   \`kubectl apply -f tekton/04-kubectl-deploy-task.yaml\`
 
 ### 3. Apply and Trigger the Pipeline
 
 1. **Apply the Pipeline definition**:
-   \`kubectl apply -f 05-pipeline.yaml\`
+   \`kubectl apply -f tekton/05-pipeline.yaml\`
 
-2. **Trigger the run**: Update parameters in \`06-pipelinerun.yaml\` to point to your specific repository and registry, then run:
-   \`kubectl create -f 06-pipelinerun.yaml\`
+2. **Trigger the run**: Update parameters in \`tekton/06-pipelinerun.yaml\` to point to your specific repository and registry, then run:
+   \`kubectl create -f tekton/06-pipelinerun.yaml\`
 
 ---
 
@@ -136,21 +136,49 @@ You need to register the reusable "Tasks" with your cluster:
     overview: "To avoid creating AWS resources manually, you can use Terraform. This configuration uses the official AWS modules to set up a new Virtual Private Cloud (VPC) and an Amazon EKS cluster with managed node groups. It also sets up the Amazon ECR repository and provisions the necessary IAM Role attached to the EKS cluster's OIDC provider, allowing the 'tekton-aws-sa' Kubernetes ServiceAccount to assume it securely.",
     files: [
       {
-        filename: "main.tf",
+        filename: "providers.tf",
         language: "hcl",
-        content: `provider "aws" {
-  region = "us-east-1"
+        content: `terraform {
+  required_version = ">= 1.0.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
 }
 
-# 1. Create a VPC for the EKS Cluster
+provider "aws" {
+  region = var.aws_region
+}`
+      },
+      {
+        filename: "variables.tf",
+        language: "hcl",
+        content: `variable "aws_region" {
+  description = "AWS region to deploy resources"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "cluster_name" {
+  description = "Name of the EKS cluster"
+  type        = string
+  default     = "tekton-cluster"
+}`
+      },
+      {
+        filename: "main.tf",
+        language: "hcl",
+        content: `# 1. Create a VPC for the EKS Cluster
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
 
-  name = "tekton-eks-vpc"
+  name = "\${var.cluster_name}-vpc"
   cidr = "10.0.0.0/16"
 
-  azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  azs             = ["\${var.aws_region}a", "\${var.aws_region}b", "\${var.aws_region}c"]
   private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
   public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
@@ -163,7 +191,7 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 19.0"
 
-  cluster_name    = "tekton-cluster"
+  cluster_name    = var.cluster_name
   cluster_version = "1.28"
 
   vpc_id                   = module.vpc.vpc_id
@@ -241,22 +269,29 @@ module "vpc_cni_irsa" {
       namespace_service_accounts = ["build-system:tekton-aws-sa"]
     }
   }
-}
-
-output "eks_cluster_name" {
-  value = module.eks.cluster_name
+}`
+      },
+      {
+        filename: "outputs.tf",
+        language: "hcl",
+        content: `output "eks_cluster_name" {
+  description = "The name of the EKS cluster"
+  value       = module.eks.cluster_name
 }
 
 output "eks_cluster_endpoint" {
-  value = module.eks.cluster_endpoint
+  description = "Endpoint for your Kubernetes API server"
+  value       = module.eks.cluster_endpoint
 }
 
 output "ecr_repository_url" {
-  value = aws_ecr_repository.app_repo.repository_url
+  description = "The URL of the repository"
+  value       = aws_ecr_repository.app_repo.repository_url
 }
 
 output "iam_role_arn" {
-  value = module.vpc_cni_irsa.iam_role_arn
+  description = "ARN of IAM role for Tekton Service Account"
+  value       = module.vpc_cni_irsa.iam_role_arn
 }`
       }
     ]

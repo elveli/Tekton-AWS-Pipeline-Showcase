@@ -1,0 +1,35 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kaniko-ecr
+  namespace: build-system
+spec:
+  workspaces:
+    - name: source
+      description: The workspace holding the source code
+  params:
+    - name: IMAGE
+      description: Name (and tag) of the ECR image to build and push.
+    - name: DOCKERFILE
+      description: Path to the Dockerfile to build.
+      default: ./Dockerfile
+    - name: CONTEXT
+      description: Path to the directory to use as context.
+      default: ./
+  steps:
+    - name: build-and-push
+      # Kaniko executor image
+      image: gcr.io/kaniko-project/executor:latest
+      workingDir: $(workspaces.source.path)
+      env:
+        # Use the IRSA credentials automatically fetched via AWS SDK inside Kaniko
+        - name: AWS_SDK_LOAD_CONFIG
+          value: "true"
+      command:
+        - /workspace/executor
+      args:
+        - --dockerfile=$(params.DOCKERFILE)
+        - --context=$(workspaces.source.path)/$(params.CONTEXT)
+        - --destination=$(params.IMAGE)
+        # Instructs kaniko to use the AWS ECR credential helper
+        - --verbosity=info

@@ -1,0 +1,27 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: my-app-deploy-run-
+  namespace: build-system
+spec:
+  pipelineRef:
+    name: aws-ecr-eks-pipeline
+  
+  # Ensure we use the SA configured with IRSA for AWS ECR push
+  serviceAccountName: tekton-aws-sa
+  
+  workspaces:
+    - name: shared-data
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+              
+  params:
+    - name: git-url
+      value: "https://github.com/my-org/my-app.git"
+    - name: image-url
+      value: "123456789012.dkr.ecr.eu-west-1.amazonaws.com/my-app:v1.0.4"

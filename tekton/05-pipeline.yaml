@@ -1,0 +1,49 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: aws-ecr-eks-pipeline
+  namespace: build-system
+spec:
+  workspaces:
+    - name: shared-data
+  params:
+    - name: git-url
+      type: string
+    - name: image-url
+      type: string
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-data
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: deleteExisting
+          value: "true"
+
+    - name: build-and-push-ecr
+      taskRef:
+        name: kaniko-ecr
+      runAfter:
+        - fetch-repository
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: IMAGE
+          value: $(params.image-url)
+
+    - name: deploy-to-cluster
+      taskRef:
+        name: deploy-eks
+      runAfter:
+        - build-and-push-ecr
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: IMAGE
+          value: $(params.image-url)
