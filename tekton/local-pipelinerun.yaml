@@ -1,0 +1,29 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: local-demo-run-
+  namespace: build-system
+spec:
+  pipelineRef:
+    name: local-demo-pipeline
+
+  # Using default service account for local (ensure it has rbac deploy permissions)
+  serviceAccountName: default
+
+  workspaces:
+    - name: shared-data
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+              
+  params:
+    - name: git-url
+      value: "https://github.com/my-org/my-app.git"
+    # ttl.sh is a free, ephemeral container registry perfect for local testing!
+    # Images automatically expire after 1 hour (or 24h, depending on tag)
+    - name: image-url
+      value: "ttl.sh/my-local-tekton-demo-99:1h"

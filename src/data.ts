@@ -50,7 +50,15 @@ Before executing this pipeline, you need:
 
 ---
 
-## Configuration & Setup
+## Local Desktop Setup (No AWS)
+ 
+ If you just want to run this pipeline locally on **Docker Desktop**, **Minikube**, or **kind** without interacting with AWS, please refer to the **Local Desktop Setup** stage in the dashboard. 
+ 
+ The dashboard provides alternative definitions (\`local-kaniko-task.yaml\`, \`local-pipeline.yaml\`, and \`local-pipelinerun.yaml\`) which utilize [ttl.sh](https://ttl.sh), a free, anonymous, ephemeral container registry perfect for local Tekton testing without authentication hassles!
+ 
+ ---
+ 
+ ## Configuration & Setup
 
 ### 0. (Optional) Provision Infrastructure with Terraform
 
@@ -146,6 +154,133 @@ You need to register the reusable "Tasks" with your cluster:
     ]
   },
   {
+    id: "local-desktop",
+    title: "Local Desktop Setup",
+    icon: "Monitor",
+    description: "Run the Tekton pipeline entirely locally using Docker Desktop or Minikube without AWS.",
+    overview: "You don't need AWS to test Tekton! This configuration uses an ephemeral, anonymous container registry (ttl.sh) and standard components, allowing you to run and debug the entire build-and-deploy pipeline locally on Docker Desktop, Minikube, or kind.",
+    files: [
+      {
+        filename: "local-kaniko-task.yaml",
+        language: "yaml",
+        content: `apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kaniko-local
+  namespace: build-system
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: IMAGE
+      description: Target registry image
+    - name: DOCKERFILE
+      default: ./Dockerfile
+    - name: CONTEXT
+      default: ./
+  steps:
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:latest
+      workingDir: $(workspaces.source.path)
+      command:
+        - /workspace/executor
+      args:
+        - --dockerfile=$(params.DOCKERFILE)
+        - --context=$(workspaces.source.path)/$(params.CONTEXT)
+        - --destination=$(params.IMAGE)
+`
+      },
+      {
+        filename: "local-pipeline.yaml",
+        language: "yaml",
+        content: `apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: local-demo-pipeline
+  namespace: build-system
+spec:
+  workspaces:
+    - name: shared-data
+  params:
+    - name: git-url
+      type: string
+    - name: image-url
+      type: string
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: shared-data
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: deleteExisting
+          value: "true"
+
+    - name: build-and-push-local
+      taskRef:
+        name: kaniko-local
+      runAfter:
+        - fetch-repository
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: IMAGE
+          value: $(params.image-url)
+
+    - name: deploy-locally
+      taskRef:
+        name: deploy-eks # The deploy task works locally too!
+      runAfter:
+        - build-and-push-local
+      workspaces:
+        - name: source
+          workspace: shared-data
+      params:
+        - name: IMAGE
+          value: $(params.image-url)
+`
+      },
+      {
+        filename: "local-pipelinerun.yaml",
+        language: "yaml",
+        content: `apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: local-demo-run-
+  namespace: build-system
+spec:
+  pipelineRef:
+    name: local-demo-pipeline
+
+  # Using default service account for local (ensure it has rbac deploy permissions)
+  serviceAccountName: default
+
+  workspaces:
+    - name: shared-data
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
+              
+  params:
+    - name: git-url
+      value: "https://github.com/my-org/my-app.git"
+    # ttl.sh is a free, ephemeral container registry perfect for local testing!
+    # Images automatically expire after 1 hour (or 24h, depending on tag)
+    - name: image-url
+      value: "ttl.sh/my-local-tekton-demo-99:1h"
+`
+      }
+    ]
+  },
+  {
     id: "infrastructure",
     title: "Infrastructure as Code",
     icon: "Cloud",
@@ -215,7 +350,7 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.29"
+  cluster_version = "1.30"
 
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
@@ -226,6 +361,7 @@ module "eks" {
 
   eks_managed_node_groups = {
     default = {
+      ami_type       = "AL2_x86_64"
       min_size       = 2
       max_size       = 5
       desired_size   = 2

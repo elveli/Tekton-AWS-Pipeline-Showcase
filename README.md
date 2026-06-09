@@ -28,6 +28,15 @@ Before executing this pipeline, you need:
 
 ---
 
+## Local Desktop Setup (No AWS)
+
+### Local Configuration Update
+If you just want to run this pipeline locally on **Docker Desktop**, **Minikube**, or **kind** without interacting with AWS, please refer to the **Local Desktop Setup** stage in the dashboard. 
+
+The dashboard provides alternative definitions (\`local-kaniko-task.yaml\`, \`local-pipeline.yaml\`, and \`local-pipelinerun.yaml\`) which utilize [ttl.sh](https://ttl.sh), a free, anonymous, ephemeral container registry perfect for local Tekton testing without authentication hassles!
+
+---
+
 ## Configuration & Setup
 
 ### 0. (Optional) Provision Infrastructure with Terraform
@@ -37,7 +46,7 @@ It provides a `main.tf` file that provisions a complete **VPC**, an **EKS Cluste
 
 **Resources Created:**
 - **VPC** (`10.45.0.0/16` by default) with public/private subnets and a NAT gateway.
-- **EKS Cluster** (`tekton-cluster`, v1.29) with managed node groups (2x `t3.medium` instances).
+- **EKS Cluster** (`tekton-cluster`, v1.30) with managed node groups (2x `t3.medium` instances).
 - **ECR Repository** (`my-app-repo`) for your container images.
 - **IAM Policy & IRSA Role** (`TektonPipelineRole`) automatically linked to your EKS OIDC provider and the `build-system:tekton-aws-sa` Kubernetes service account.
 

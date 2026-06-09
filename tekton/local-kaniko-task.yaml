@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: kaniko-local
+  namespace: build-system
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: IMAGE
+      description: Target registry image
+    - name: DOCKERFILE
+      default: ./Dockerfile
+    - name: CONTEXT
+      default: ./
+  steps:
+    - name: build-and-push
+      image: gcr.io/kaniko-project/executor:latest
+      workingDir: $(workspaces.source.path)
+      command:
+        - /workspace/executor
+      args:
+        - --dockerfile=$(params.DOCKERFILE)
+        - --context=$(workspaces.source.path)/$(params.CONTEXT)
+        - --destination=$(params.IMAGE)
