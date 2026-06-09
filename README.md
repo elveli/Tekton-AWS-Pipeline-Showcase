@@ -19,9 +19,9 @@ In the interactive dashboard (the React app), you can click through the "Pipelin
 Before executing this pipeline, you need:
 1. **Amazon EKS Cluster**: An active Kubernetes cluster running on AWS. *(Can be provisioned via the included Terraform configuration).*
 2. **Tekton Installed**: Tekton Pipelines installed on your EKS cluster.
-   \`\`\`bash
+   ```bash
    kubectl apply --filename https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
-   \`\`\`
+   ```
 3. **OIDC Provider Enabled**: Your EKS cluster must have an IAM OIDC provider configured (required for IRSA).
 4. **AWS ECR Repository**: A target container registry (e.g., `123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app`). *(Can be provisioned via Terraform).*
 5. **Git Repository**: A repository containing a `Dockerfile` and some Kubernetes deployment manifests in a `k8s/` folder.
@@ -35,12 +35,12 @@ Before executing this pipeline, you need:
 If you prefer Infrastructure as Code over manual setup, check the **Infrastructure as Code** stage in the dashboard.
 It provides a `main.tf` file that provisions a complete **VPC**, an **EKS Cluster**, the **ECR repository**, and the OIDC-backed **IAM Role** for Tekton.
 
-\`\`\`bash
+```bash
 terraform init
 terraform apply
 # After applying, configure your local kubeconfig:
 aws eks update-kubeconfig --region us-east-1 --name tekton-cluster
-\`\`\`
+```
 
 *(If you use Terraform, you can skip Step 1 below).*
 
@@ -96,13 +96,13 @@ kubectl apply -f tekton/05-pipeline.yaml
 ### 4. Trigger the PipelineRun
 
 Finally, update the parameters in `tekton/06-pipelinerun.yaml` to point to your specific Git repository and ECR registry:
-\`\`\`yaml
+```yaml
   params:
     - name: git-url
       value: "https://github.com/your-org/your-repo.git"
     - name: image-url
       value: "YOUR_ACCOUNT_ID.dkr.ecr.YOUR_REGION.amazonaws.com/your-app:v1.0.0"
-\`\`\`
+```
 
 Execute the run:
 ```bash
@@ -115,18 +115,18 @@ kubectl create -f tekton/06-pipelinerun.yaml
 
 Once the `PipelineRun` is created, Tekton orchestrates the pods.
 
-### Using Tekton CLI (\`tkn\`)
+### Using Tekton CLI (`tkn`)
 Observe the logs interactively:
-\`\`\`bash
+```bash
 tkn pipelinerun logs -f -L
-\`\`\`
+```
 
 ### Using kubectl
 Check the status of the PipelineRun:
-\`\`\`bash
+```bash
 kubectl get pipelinerun
 kubectl describe pipelinerun <run-name>
-\`\`\`
+```
 
 ---
 
@@ -156,7 +156,7 @@ kubectl describe pipelinerun <run-name>
 ### 4. Deploy task fails with `PermissionDenied`
 **Cause**: The Service Account (`tekton-aws-sa`) needs Kubernetes RBAC permissions to `apply` Deployments and Services in the target namespace.
 **Fix**: Create a Role and RoleBinding granting appropriate access over Kubernetes objects.
-\`\`\`yaml
+```yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -170,4 +170,4 @@ roleRef:
   kind: ClusterRole
   name: edit # or admin, depending on resources created
   apiGroup: rbac.authorization.k8s.io
-\`\`\`
+```
