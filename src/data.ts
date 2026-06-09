@@ -170,7 +170,7 @@ variable "cluster_name" {
 variable "vpc_cidr" {
   description = "The CIDR block for the VPC"
   type        = string
-  default     = "10.42.0.0/16"
+  default     = "10.45.0.0/16"
 }`
       },
       {
@@ -195,16 +195,17 @@ module "vpc" {
 # 2. Provision the EKS Cluster
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 19.0"
+  version = "~> 20.0"
 
   cluster_name    = var.cluster_name
-  cluster_version = "1.28"
+  cluster_version = "1.29"
 
   vpc_id                   = module.vpc.vpc_id
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.public_subnets
   
   cluster_endpoint_public_access = true
+  enable_cluster_creator_admin_permissions = true
 
   eks_managed_node_groups = {
     default = {
@@ -220,7 +221,7 @@ module "eks" {
 resource "aws_ecr_repository" "app_repo" {
   name                 = "my-app-repo"
   image_tag_mutability = "MUTABLE"
-  force_destroy        = true # For demo purposes
+  force_delete         = true # For demo purposes
 
   image_scanning_configuration {
     scan_on_push = true

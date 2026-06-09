@@ -35,6 +35,12 @@ Before executing this pipeline, you need:
 If you prefer Infrastructure as Code over manual setup, check the **Infrastructure as Code** stage in the dashboard.
 It provides a `main.tf` file that provisions a complete **VPC**, an **EKS Cluster**, the **ECR repository**, and the OIDC-backed **IAM Role** for Tekton.
 
+**Resources Created:**
+- **VPC** (`10.45.0.0/16` by default) with public/private subnets and a NAT gateway.
+- **EKS Cluster** (`tekton-cluster`, v1.29) with managed node groups (2x `t3.medium` instances).
+- **ECR Repository** (`my-app-repo`) for your container images.
+- **IAM Policy & IRSA Role** (`TektonPipelineRole`) automatically linked to your EKS OIDC provider and the `build-system:tekton-aws-sa` Kubernetes service account.
+
 ```bash
 terraform init
 terraform apply

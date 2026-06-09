@@ -13,5 +13,5 @@ variable "cluster_name" {
 variable "vpc_cidr" {
   description = "The CIDR block for the VPC"
   type        = string
-  default     = "10.42.0.0/16"
+  default     = "10.45.0.0/16"
 }
