@@ -48,13 +48,28 @@ terraform apply
 aws eks update-kubeconfig --region us-east-1 --name tekton-cluster
 ```
 
-*(If you use Terraform, you can skip Step 1 below).*
+*(If you use Terraform, skip the AWS IAM steps in Section 1, but you must still apply the Kubernetes Service Account manifest).*
 
 ---
 
-### 1. Configure IAM Roles for Service Accounts (IRSA)
+### 1. Configure the Kubernetes Service Account & IRSA
 
-IRSA is the most secure way for pods acting in your pipeline to push to ECR without long-lived credentials. If you didn't run Terraform, you can configure it manually:
+Regardless of whether you used Terraform or a manual AWS setup, your Kubernetes cluster needs a `ServiceAccount` properly annotated with the AWS IAM Role ARN so Tekton can authenticate via IRSA.
+
+**If you used Terraform:**
+1. Get the generated IAM Role ARN:
+   ```bash
+   terraform output iam_role_arn
+   ```
+2. Edit `tekton/01-service-account.yaml` and replace the `eks.amazonaws.com/role-arn` annotation with your actual ARN.
+3. Apply the manifest:
+   ```bash
+   kubectl apply -f tekton/01-service-account.yaml
+   ```
+4. *Skip to Step 2.*
+
+**If you are doing a manual setup (No Terraform):**
+If you didn't run Terraform, you can configure the AWS resources manually using `aws` and `eksctl`:
 
 **A. Create an IAM Policy for ECR Access:**
 Copy the policy from the "AWS IRSA Setup" stage (`tekton/iam-policy.json`) and create it in AWS IAM:
@@ -73,7 +88,7 @@ eksctl create iamserviceaccount \
   --approve
 ```
 
-*(Note: If you already applied `tekton/01-service-account.yaml` manually, ensure the `eks.amazonaws.com/role-arn` annotation matches the role created above).*
+*(Note: `eksctl create iamserviceaccount` automatically creates the Kubernetes ServiceAccount for you. You do not need to apply `tekton/01-service-account.yaml` if you chose this route).*
 
 ### 2. Apply Tekton Tasks
 
