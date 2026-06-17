@@ -145,17 +145,67 @@ kubectl create -f tekton/06-pipelinerun.yaml
 
 Once the `PipelineRun` is created, Tekton orchestrates the pods.
 
+### Using Tekton Dashboard (Web UI)
+Tekton provides an official web-based dashboard that lets you visualize Pipelines, PipelineRuns, and Task logs directly from your browser.
+
+Install the Dashboard:
+```bash
+kubectl apply --filename https://storage.googleapis.com/tekton-releases/dashboard/latest/release.yaml
+```
+
+Access the Dashboard via port-forwarding:
+```bash
+kubectl --namespace tekton-pipelines port-forward svc/tekton-dashboard 9097:9097
+```
+Then, open [http://localhost:9097](http://localhost:9097) in your browser.
+
 ### Using Tekton CLI (`tkn`)
-Observe the logs interactively:
+The Tekton CLI (`tkn`) provides the best developer experience for managing pipelines.
+
+Observe the logs interactively for the last PipelineRun:
 ```bash
 tkn pipelinerun logs -f -L
 ```
 
+List all PipelineRuns:
+```bash
+tkn pipelinerun list
+```
+
+Describe a specific PipelineRun to see detailed task status:
+```bash
+tkn pipelinerun describe <run-name>
+```
+
+Cancel a running PipelineRun:
+```bash
+tkn pipelinerun cancel <run-name>
+```
+
 ### Using kubectl
+If you don't have the `tkn` CLI installed, `kubectl` works too.
+
 Check the status of the PipelineRun:
 ```bash
 kubectl get pipelinerun
+```
+
+Describe the PipelineRun in detail (useful for finding why a run failed or is pending):
+```bash
 kubectl describe pipelinerun <run-name>
+```
+
+Check the individual underlying TaskRuns:
+```bash
+kubectl get taskrun
+kubectl describe taskrun <taskrun-name>
+```
+
+Get logs of the actual Pod running the Task:
+```bash
+kubectl get pods
+# Note: Tekton pods usually have the TaskRun name prefix
+kubectl logs <pod-name> -c step-<step-name>
 ```
 
 ---
