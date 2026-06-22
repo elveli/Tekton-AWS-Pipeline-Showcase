@@ -12,6 +12,10 @@ module "vpc" {
 
   enable_nat_gateway = true
   single_nat_gateway = true
+
+  tags = {
+    terraform = "true"
+  }
 }
 
 # 2. Provision the EKS Cluster
@@ -38,6 +42,10 @@ module "eks" {
       instance_types = ["t3.medium"]
     }
   }
+
+  tags = {
+    terraform = "true"
+  }
 }
 
 # 3. Create the ECR Repository
@@ -48,6 +56,10 @@ resource "aws_ecr_repository" "app_repo" {
 
   image_scanning_configuration {
     scan_on_push = true
+  }
+
+  tags = {
+    terraform = "true"
   }
 }
 
@@ -79,6 +91,10 @@ resource "aws_iam_policy" "tekton_ecr_policy" {
       }
     ]
   })
+
+  tags = {
+    terraform = "true"
+  }
 }
 
 # 5. IAM Role for Service Accounts (IRSA)
@@ -98,5 +114,9 @@ module "vpc_cni_irsa" {
       provider_arn               = module.eks.oidc_provider_arn
       namespace_service_accounts = ["build-system:tekton-aws-sa"]
     }
+  }
+
+  tags = {
+    terraform = "true"
   }
 }

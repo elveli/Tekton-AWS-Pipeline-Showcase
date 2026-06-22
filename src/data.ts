@@ -52,9 +52,9 @@ Before executing this pipeline, you need:
 
 ## Local Desktop Setup (No AWS)
  
- If you just want to run this pipeline locally on **Docker Desktop**, **Minikube**, or **kind** without interacting with AWS, please refer to the **Local Desktop Setup** stage in the dashboard. 
+ If you prefer to test Tekton locally (e.g., using **Docker Desktop, Minikube, or kind**) without provisioning any AWS resources, you can skip the AWS-specific steps.
  
- The dashboard provides alternative definitions (\`local-kaniko-task.yaml\`, \`local-pipeline.yaml\`, and \`local-pipelinerun.yaml\`) which utilize [ttl.sh](https://ttl.sh), a free, anonymous, ephemeral container registry perfect for local Tekton testing without authentication hassles!
+ Instead, open the application dashboard and navigate to the **Local Desktop Setup (No AWS)** stage. There, you'll find alternative Kubernetes manifests (\`local-kaniko-task.yaml\`, \`local-pipeline.yaml\`, and \`local-pipelinerun.yaml\`) designed specifically for local clusters. These use [ttl.sh](https://ttl.sh), a free, anonymous, and ephemeral container registry, allowing you to build and push images locally without dealing with Docker Hub or AWS ECR authentication hassles!
  
  ---
  
@@ -72,7 +72,7 @@ terraform apply
 aws eks update-kubeconfig --region us-east-1 --name tekton-cluster
 \`\`\`
 
-*(If you use Terraform, skip the AWS IAM steps in Section 1, but you must still apply the Kubernetes Service Account manifest).*
+*(Note: If you use the Terraform module to create your cluster and IAM roles, you can skip the manual AWS CLI and \`eksctl\` commands in Section 1. However, you must still apply the \`01-service-account.yaml\` file to your cluster so Tekton can assume the IAM role).*
 
 ---
 
@@ -86,8 +86,9 @@ Regardless of whether you used Terraform or a manual AWS setup, your Kubernetes 
    terraform output iam_role_arn
    \`\`\`
 2. Edit \`tekton/01-service-account.yaml\` and replace the \`eks.amazonaws.com/role-arn\` annotation with your actual ARN.
-3. Apply the manifest:
+3. Apply the namespace and the manifest:
    \`\`\`bash
+   kubectl create namespace build-system
    kubectl apply -f tekton/01-service-account.yaml
    \`\`\`
 4. *Skip to Step 2.*
@@ -117,7 +118,7 @@ eksctl create iamserviceaccount \\
 You need to register the reusable "Tasks" with your cluster:
 
 1. **Git Clone Task**:
-   \`kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml\`
+   \`kubectl apply -n build-system -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml\`
 2. **Kaniko ECR Task**:
    \`kubectl apply -f tekton/03-kaniko-ecr-task.yaml\`
 3. **Deploy EKS Task**:
@@ -156,22 +157,22 @@ The Tekton CLI (\`tkn\`) provides the best developer experience for managing pip
 
 Observe the logs interactively for the last PipelineRun:
 \`\`\`bash
-tkn pipelinerun logs -f -L
+tkn pipelinerun logs -f -L -n build-system
 \`\`\`
 
 List all PipelineRuns:
 \`\`\`bash
-tkn pipelinerun list
+tkn pipelinerun list -n build-system
 \`\`\`
 
 Describe a specific PipelineRun to see detailed task status:
 \`\`\`bash
-tkn pipelinerun describe <run-name>
+tkn pipelinerun describe <run-name> -n build-system
 \`\`\`
 
 Cancel a running PipelineRun:
 \`\`\`bash
-tkn pipelinerun cancel <run-name>
+tkn pipelinerun cancel <run-name> -n build-system
 \`\`\`
 
 ### Using kubectl
@@ -179,25 +180,25 @@ If you don't have the \`tkn\` CLI installed, \`kubectl\` works too.
 
 Check the status of the PipelineRun:
 \`\`\`bash
-kubectl get pipelinerun
+kubectl get pipelinerun -n build-system
 \`\`\`
 
 Describe the PipelineRun in detail (useful for finding why a run failed or is pending):
 \`\`\`bash
-kubectl describe pipelinerun <run-name>
+kubectl describe pipelinerun <run-name> -n build-system
 \`\`\`
 
 Check the individual underlying TaskRuns:
 \`\`\`bash
-kubectl get taskrun
-kubectl describe taskrun <taskrun-name>
+kubectl get taskrun -n build-system
+kubectl describe taskrun <taskrun-name> -n build-system
 \`\`\`
 
 Get logs of the actual Pod running the Task:
 \`\`\`bash
-kubectl get pods
+kubectl get pods -n build-system
 # Note: Tekton pods usually have the TaskRun name prefix
-kubectl logs <pod-name> -c step-<step-name>
+kubectl logs <pod-name> -c step-<step-name> -n build-system
 \`\`\`
 
 ---
@@ -212,9 +213,9 @@ kubectl logs <pod-name> -c step-<step-name>
 **Cause**: The Git repository is private.
 **Fix**: Create a Kubernetes Secret containing your Git credentials and attach it to the \`tekton-aws-sa\` ServiceAccount.
 
-### 3. PipelineRun stays in Pending state
-**Cause**: Usually a missing Workspace (PersistentVolumeClaim).
-**Fix**: Ensure your cluster has a default StorageClass capable of dynamic provisioning, or manually create the PersistentVolume attached to the Workspace.
+### 3. PipelineRun stays in Pending or Running state (Logs hang)
+**Cause**: Usually a missing Workspace (PersistentVolumeClaim) or inadequate cluster resources. If \`tkn pipelinerun logs\` hangs indefinitely, the task Pods cannot start.
+**Fix**: Inspect \`kubectl describe pr <name> -n build-system\` or \`kubectl get pvc -n build-system\`. **Note for EKS >= 1.23**: You MUST install the Amazon EBS CSI Driver add-on (\`aws-ebs-csi-driver\`) to your cluster so it can dynamically provision the volumes (or manually create the PersistentVolume). Ensure your cluster has a default StorageClass capable of dynamic provisioning.
 
 ### 4. Deploy task fails with PermissionDenied
 **Cause**: The Service Account lacks Kubernetes RBAC permissions to apply deployments.
@@ -411,6 +412,10 @@ module "vpc" {
 
   enable_nat_gateway = true
   single_nat_gateway = true
+
+  tags = {
+    terraform = "true"
+  }
 }
 
 # 2. Provision the EKS Cluster
@@ -437,6 +442,10 @@ module "eks" {
       instance_types = ["t3.medium"]
     }
   }
+
+  tags = {
+    terraform = "true"
+  }
 }
 
 # 3. Create the ECR Repository
@@ -447,6 +456,10 @@ resource "aws_ecr_repository" "app_repo" {
 
   image_scanning_configuration {
     scan_on_push = true
+  }
+
+  tags = {
+    terraform = "true"
   }
 }
 
@@ -478,6 +491,10 @@ resource "aws_iam_policy" "tekton_ecr_policy" {
       }
     ]
   })
+
+  tags = {
+    terraform = "true"
+  }
 }
 
 # 5. IAM Role for Service Accounts (IRSA)
@@ -497,6 +514,10 @@ module "vpc_cni_irsa" {
       provider_arn               = module.eks.oidc_provider_arn
       namespace_service_accounts = ["build-system:tekton-aws-sa"]
     }
+  }
+
+  tags = {
+    terraform = "true"
   }
 }`
       },
@@ -589,7 +610,7 @@ secrets:
         language: "yaml",
         content: `# We use the standard git-clone task from tektoncd/catalog.
 # You can install it directly on your cluster:
-# kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml
+# kubectl apply -n build-system -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml
 #
 # This relies on the Workspace (shared volume) attached to the PipelineRun.
 `

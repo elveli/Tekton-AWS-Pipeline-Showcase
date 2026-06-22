@@ -31,9 +31,9 @@ Before executing this pipeline, you need:
 ## Local Desktop Setup (No AWS)
 
 ### Local Configuration Update
-If you just want to run this pipeline locally on **Docker Desktop**, **Minikube**, or **kind** without interacting with AWS, please refer to the **Local Desktop Setup** stage in the dashboard. 
+If you prefer to test Tekton locally (e.g., using **Docker Desktop**, **Minikube**, or **kind**) without provisioning any AWS resources, you can skip the AWS-specific steps.
 
-The dashboard provides alternative definitions (\`local-kaniko-task.yaml\`, \`local-pipeline.yaml\`, and \`local-pipelinerun.yaml\`) which utilize [ttl.sh](https://ttl.sh), a free, anonymous, ephemeral container registry perfect for local Tekton testing without authentication hassles!
+Instead, open the application dashboard and navigate to the **Local Desktop Setup (No AWS)** stage. There, you'll find alternative Kubernetes manifests (`local-kaniko-task.yaml`, `local-pipeline.yaml`, and `local-pipelinerun.yaml`) designed specifically for local clusters. These use [ttl.sh](https://ttl.sh), a free, anonymous, and ephemeral container registry, allowing you to build and push images locally without dealing with Docker Hub or AWS ECR authentication hassles!
 
 ---
 
@@ -57,7 +57,7 @@ terraform apply
 aws eks update-kubeconfig --region us-east-1 --name tekton-cluster
 ```
 
-*(If you use Terraform, skip the AWS IAM steps in Section 1, but you must still apply the Kubernetes Service Account manifest).*
+*(Note: If you use the Terraform module to create your cluster and IAM roles, you can skip the manual AWS CLI and `eksctl` commands in Section 1. However, you must still apply the `01-service-account.yaml` file to your cluster so Tekton can assume the IAM role).*
 
 ---
 
@@ -71,8 +71,9 @@ Regardless of whether you used Terraform or a manual AWS setup, your Kubernetes 
    terraform output iam_role_arn
    ```
 2. Edit `tekton/01-service-account.yaml` and replace the `eks.amazonaws.com/role-arn` annotation with your actual ARN.
-3. Apply the manifest:
+3. Apply the namespace and the manifest:
    ```bash
+   kubectl create namespace build-system
    kubectl apply -f tekton/01-service-account.yaml
    ```
 4. *Skip to Step 2.*
@@ -105,7 +106,7 @@ You need to register the reusable "Tasks" with your cluster:
 
 1. **Git Clone Task** (from Tekton Catalog):
    ```bash
-   kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml
+   kubectl apply -n build-system -f https://raw.githubusercontent.com/tektoncd/catalog/main/task/git-clone/0.9/git-clone.yaml
    ```
 2. **Kaniko ECR Task**:
    ```bash
@@ -164,22 +165,22 @@ The Tekton CLI (`tkn`) provides the best developer experience for managing pipel
 
 Observe the logs interactively for the last PipelineRun:
 ```bash
-tkn pipelinerun logs -f -L
+tkn pipelinerun logs -f -L -n build-system
 ```
 
 List all PipelineRuns:
 ```bash
-tkn pipelinerun list
+tkn pipelinerun list -n build-system
 ```
 
 Describe a specific PipelineRun to see detailed task status:
 ```bash
-tkn pipelinerun describe <run-name>
+tkn pipelinerun describe <run-name> -n build-system
 ```
 
 Cancel a running PipelineRun:
 ```bash
-tkn pipelinerun cancel <run-name>
+tkn pipelinerun cancel <run-name> -n build-system
 ```
 
 ### Using kubectl
@@ -187,25 +188,25 @@ If you don't have the `tkn` CLI installed, `kubectl` works too.
 
 Check the status of the PipelineRun:
 ```bash
-kubectl get pipelinerun
+kubectl get pipelinerun -n build-system
 ```
 
 Describe the PipelineRun in detail (useful for finding why a run failed or is pending):
 ```bash
-kubectl describe pipelinerun <run-name>
+kubectl describe pipelinerun <run-name> -n build-system
 ```
 
 Check the individual underlying TaskRuns:
 ```bash
-kubectl get taskrun
-kubectl describe taskrun <taskrun-name>
+kubectl get taskrun -n build-system
+kubectl describe taskrun <taskrun-name> -n build-system
 ```
 
 Get logs of the actual Pod running the Task:
 ```bash
-kubectl get pods
+kubectl get pods -n build-system
 # Note: Tekton pods usually have the TaskRun name prefix
-kubectl logs <pod-name> -c step-<step-name>
+kubectl logs <pod-name> -c step-<step-name> -n build-system
 ```
 
 ---
@@ -227,11 +228,14 @@ kubectl logs <pod-name> -c step-<step-name>
 - Attach the secret to the `tekton-aws-sa` ServiceAccount using the `secrets:` array.
 - Reference the Tekton documentation on ["Authentication for Git"](https://tekton.dev/docs/pipelines/auth/).
 
-### 3. PipelineRun stays in `Pending` state forever
-**Cause**: Usually a missing Workspace (PersistentVolumeClaim).
+### 3. PipelineRun stays in `Pending` or `Running` state forever (Logs hang)
+**Cause**: Usually a missing Workspace (PersistentVolumeClaim) or inadequate cluster resources. If `tkn pipelinerun logs -f -L` hangs indefinitely, the underlying Kubernetes task Pods cannot start.
 **Fix**:
-- Check the PipelineRun description: `kubectl describe pr <name>`.
-- If it complains about PVCs, ensure your cluster has a default StorageClass capable of dynamic provisioning (like `gp2` or `gp3` on EKS), or manually create the PersistentVolume attached to the Workspace.
+- Check the PipelineRun description: `kubectl describe pr <name> -n build-system`.
+- Check for PVC issues: `kubectl get pvc -n build-system`.
+- **EKS >= 1.23**: EKS no longer includes the EBS provisioner by default. If your PVCs are stuck in `Pending` state, you MUST install the **Amazon EBS CSI Driver** add-on (`aws-ebs-csi-driver`) to your cluster so it can dynamically provision the volumes.
+- Ensure your cluster has a default StorageClass capable of dynamic provisioning (like `gp2` or `gp3` on EKS).
+- Check for pending pods due to resource limits: `kubectl get pods -n build-system`.
 
 ### 4. Deploy task fails with `PermissionDenied`
 **Cause**: The Service Account (`tekton-aws-sa`) needs Kubernetes RBAC permissions to `apply` Deployments and Services in the target namespace.
